@@ -1,0 +1,8 @@
+#The prefix for the plugin
+prefix: "&8[&9Saddles&8]"
+
+#The amount of ticks a person must ride the mount for per level (multiplied by the level)
+requiredTickMultiplier: 480
+
+#The delay between clicking a saddle and the mount spawning
+mountSpawnDelay: 30
