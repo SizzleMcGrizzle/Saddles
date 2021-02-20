@@ -36,10 +36,10 @@ public class MountData implements ConfigurationSerializable {
     private MountEditorMenu menu;
     private Horse horse;
     
-    public MountData(UUID id, UUID lastOwner) {
+    public MountData(UUID id, UUID lastOwner, int baseLevel) {
         this.id = id;
         this.lastOwner = lastOwner;
-        this.ticksRidden = Config.REQUIRED_TICKS[0];
+        this.ticksRidden = Config.REQUIRED_TICKS[baseLevel];
         level = 0;
         setAttributes();
     }
@@ -105,11 +105,11 @@ public class MountData implements ConfigurationSerializable {
             horse.setColor(color);
             horse.setCustomName(ChatColor.GREEN + Bukkit.getOfflinePlayer(lastOwner).getName() + "'s mount §7(" + (level + 1) + "/30)");
             
-            horse.getPersistentDataContainer().set(Saddles.SADDLE_KEY, PersistentDataType.STRING, "true");
+            horse.getPersistentDataContainer().set(Saddles.SADDLE_KEY, PersistentDataType.INTEGER, level);
             
             ItemStack saddle = new ItemStack(Material.SADDLE);
             ItemMeta meta = saddle.getItemMeta();
-            meta.getPersistentDataContainer().set(Saddles.SADDLE_KEY, PersistentDataType.STRING, "true");
+            meta.getPersistentDataContainer().set(Saddles.SADDLE_KEY, PersistentDataType.INTEGER, level);
             saddle.setItemMeta(meta);
             
             horse.getInventory().setSaddle(saddle);

@@ -124,8 +124,12 @@ public class Saddles extends JavaPlugin implements Listener {
         }
     }
     
-    public MountData getMountData(UUID mountID, UUID lastOwner) {
-        return mounts.compute(mountID, (k, v) -> v == null ? new MountData(mountID, lastOwner) : v);
+    public MountData getMountData(ItemStack item, UUID lastOwner) {
+        UUID uuid = getSaddleUUID(item.getItemMeta().getPersistentDataContainer());
+        int baseLevel = getSaddleBaseLevel(item.getItemMeta().getPersistentDataContainer());
+        
+        return mounts.compute(uuid,
+                (k, v) -> v == null ? new MountData(uuid, lastOwner, baseLevel) : v);
     }
     
     @EventHandler
@@ -148,17 +152,11 @@ public class Saddles extends JavaPlugin implements Listener {
                 new LambdaRunnable(() -> mountCooldowns.remove(player.getUniqueId())).runTaskLater(this, Config.MOUNT_SPAWN_DELAY);
             }
         
-        
         //Get UUID to get saddle, if it exists get it, if not create a new UUID and add it
-        UUID saddleUUID;
-        if (doesSaddleHaveUUID(item.getItemMeta().getPersistentDataContainer()))
-            saddleUUID = getSaddleUUID(item.getItemMeta().getPersistentDataContainer());
-        else {
-            saddleUUID = UUID.randomUUID();
-            setSaddleUUID(item, saddleUUID);
-        }
+        if (!hasSaddleUUID(item.getItemMeta().getPersistentDataContainer()))
+            setSaddleUUID(item, UUID.randomUUID());
         
-        MountData data = getMountData(saddleUUID, player.getUniqueId());
+        MountData data = getMountData(item, player.getUniqueId());
         player.getInventory().setItemInMainHand(formatItemStack(item, player, data));
         
         if (event.getAction() == Action.RIGHT_CLICK_BLOCK || event.getAction() == Action.RIGHT_CLICK_AIR) {
@@ -269,7 +267,11 @@ public class Saddles extends JavaPlugin implements Listener {
     }
     
     public boolean hasSaddleKey(PersistentDataContainer container) {
-        return container.has(SADDLE_KEY, PersistentDataType.STRING);
+        return container.has(SADDLE_KEY, PersistentDataType.INTEGER);
+    }
+    
+    public int getSaddleBaseLevel(PersistentDataContainer container) {
+        return container.has(SADDLE_KEY, PersistentDataType.INTEGER) ? container.get(SADDLE_KEY, PersistentDataType.INTEGER) : 0;
     }
     
     public void setSaddleUUID(ItemStack item, UUID uuid) {
@@ -278,7 +280,7 @@ public class Saddles extends JavaPlugin implements Listener {
         item.setItemMeta(meta);
     }
     
-    public boolean doesSaddleHaveUUID(PersistentDataContainer container) {
+    public boolean hasSaddleUUID(PersistentDataContainer container) {
         String id = container.get(SADDLE_UUID_KEY, PersistentDataType.STRING);
         return id != null && UUID.fromString(id) != null;
     }

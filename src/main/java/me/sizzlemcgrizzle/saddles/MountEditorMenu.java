@@ -53,7 +53,7 @@ public class MountEditorMenu {
                 .setEnchantmentGlow(data.getCustomColor() == color).build());
         inventory.setClickAction(slot, player -> {
             data.setCustomColor(color);
-            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.5F, 1f);
+            player.playSound(player.getLocation(), Sound.ENTITY_HORSE_AMBIENT, 0.5F, 1f);
             createInventory();
             display(player);
         });
@@ -66,7 +66,7 @@ public class MountEditorMenu {
                 .setEnchantmentGlow(data.getCustomArmor() != null && data.getCustomArmor().getType() == material).build());
         inventory.setClickAction(slot, player -> {
             data.setCustomArmor(new ItemStack(material));
-            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.5F, 1f);
+            player.playSound(player.getLocation(), Sound.ENTITY_HORSE_AMBIENT, 0.5F, 1f);
             createInventory();
             display(player);
         });
@@ -76,7 +76,7 @@ public class MountEditorMenu {
         inventory.setItem(17, new ItemBuilder(Material.BARRIER).setDisplayName("§4Remove custom armor").build());
         inventory.setClickAction(17, player -> {
             data.setCustomArmor(null);
-            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.5F, 1f);
+            player.playSound(player.getLocation(), Sound.ENTITY_HORSE_AMBIENT, 0.5F, 1f);
             createInventory();
             display(player);
         });
@@ -86,7 +86,7 @@ public class MountEditorMenu {
         inventory.setItem(8, new ItemBuilder(Material.BARRIER).setDisplayName("§4Remove custom color").build());
         inventory.setClickAction(8, player -> {
             data.setCustomColor(null);
-            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.5F, 1f);
+            player.playSound(player.getLocation(), Sound.ENTITY_HORSE_AMBIENT, 0.5F, 1f);
             createInventory();
             display(player);
         });

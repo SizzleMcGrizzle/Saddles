@@ -47,12 +47,12 @@ public class SaddlesSetLevelCommand extends SubCommand {
             return null;
         }
         
-        if (!plugin.doesSaddleHaveUUID(item.getItemMeta().getPersistentDataContainer())) {
+        if (!plugin.hasSaddleUUID(item.getItemMeta().getPersistentDataContainer())) {
             MessageUtil.sendMessage(plugin, sender, MessageLevel.INFO, "You must hold a saddle that already has a mount assigned.");
             return null;
         }
         
-        MountData data = plugin.getMountData(plugin.getSaddleUUID(item.getItemMeta().getPersistentDataContainer()), null);
+        MountData data = plugin.getMountData(item, null);
         int index;
         try {
             index = Integer.parseInt(args[1]);
