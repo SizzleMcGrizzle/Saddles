@@ -81,7 +81,7 @@ public class Saddles extends JavaPlugin implements Listener {
             for (Player p : Bukkit.getOnlinePlayers()) {
                 
                 if (p.getVehicle() == null)
-                    return;
+                    continue;
                 
                 if (tickID % 100 == 0)
                     lastLocations.put(p.getUniqueId(), p.getLocation());
@@ -92,7 +92,7 @@ public class Saddles extends JavaPlugin implements Listener {
                         .collect(Collectors.toList());
                 
                 if (pMounts.size() == 0)
-                    return;
+                    continue;
                 
                 for (MountData mountData : pMounts)
                     if (p.getVehicle() != null && p.getVehicle().equals(mountData.getHorse()))
@@ -267,7 +267,7 @@ public class Saddles extends JavaPlugin implements Listener {
     }
     
     public boolean hasSaddleKey(PersistentDataContainer container) {
-        return container.has(SADDLE_KEY, PersistentDataType.INTEGER);
+        return container.has(SADDLE_KEY, PersistentDataType.INTEGER) || container.has(SADDLE_KEY, PersistentDataType.STRING);
     }
     
     public int getSaddleBaseLevel(PersistentDataContainer container) {
