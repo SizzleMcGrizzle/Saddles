@@ -24,17 +24,6 @@ import java.util.UUID;
 
 public class MountData implements ConfigurationSerializable {
     
-    public static final long[] requiredTicks = new long[30];
-    
-    static {
-        for (int i = 0; i < requiredTicks.length; i++) {
-            long ticks = i * Config.REQUIRED_TICK_MULTIPLIER;
-            if (i != 0)
-                ticks += requiredTicks[i - 1];
-            requiredTicks[i] = ticks;
-        }
-    }
-    
     private UUID id;
     private UUID lastOwner;
     
@@ -50,7 +39,7 @@ public class MountData implements ConfigurationSerializable {
     public MountData(UUID id, UUID lastOwner) {
         this.id = id;
         this.lastOwner = lastOwner;
-        this.ticksRidden = requiredTicks[0];
+        this.ticksRidden = Config.REQUIRED_TICKS[0];
         level = 0;
         setAttributes();
     }
@@ -63,17 +52,16 @@ public class MountData implements ConfigurationSerializable {
         this.customArmor = map.containsKey("armor") ? (ItemStack) map.get("armor") : null;
         this.customColor = map.containsKey("color") ? Horse.Color.valueOf((String) map.get("color")) : null;
         
-        
         calculateLevel();
         setAttributes();
     }
     
     private void calculateLevel() {
-        if (ticksRidden >= requiredTicks[requiredTicks.length - 1])
+        if (ticksRidden >= Config.REQUIRED_TICKS[Config.REQUIRED_TICKS.length - 1])
             this.level = 29;
         else
-            for (int i = 0; i < requiredTicks.length - 1; i++) {
-                if (ticksRidden >= requiredTicks[i] && ticksRidden < requiredTicks[i + 1]) {
+            for (int i = 0; i < Config.REQUIRED_TICKS.length - 1; i++) {
+                if (ticksRidden >= Config.REQUIRED_TICKS[i] && ticksRidden < Config.REQUIRED_TICKS[i + 1]) {
                     this.level = i;
                     break;
                 }
@@ -91,7 +79,8 @@ public class MountData implements ConfigurationSerializable {
         int calcLevel = level + 4;
         
         double speed = calcLevel / 30D;
-        double jump = calcLevel / 25D;
+        //double jump = calcLevel / 25D;
+        double jump = Math.log(calcLevel) / 3;
         
         if (customColor == null)
             switch ((level) / 10) {
@@ -239,8 +228,8 @@ public class MountData implements ConfigurationSerializable {
     
     public String formatLevel() {
         StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < requiredTicks.length; i++)
-            if (i % (requiredTicks.length / 5) == 0 && level >= i)
+        for (int i = 0; i < Config.REQUIRED_TICKS.length; i++)
+            if (i % (Config.REQUIRED_TICKS.length / 5) == 0 && level >= i)
                 builder.append("✰");
         return builder.toString();
     }
@@ -251,12 +240,12 @@ public class MountData implements ConfigurationSerializable {
         if (player == null || !player.isOnline())
             return;
         
-        if (level >= requiredTicks.length - 1) {
-            player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent("§6§lMAXIMUM LEVEL - " + requiredTicks.length));
+        if (level >= Config.REQUIRED_TICKS.length - 1) {
+            player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent("§6§lMAXIMUM LEVEL - " + Config.REQUIRED_TICKS.length));
             return;
         }
         
-        double progress = (ticksRidden - requiredTicks[level]) / ((double) (requiredTicks[level + 1] - requiredTicks[level]));
+        double progress = (ticksRidden - Config.REQUIRED_TICKS[level]) / ((double) (Config.REQUIRED_TICKS[level + 1] - Config.REQUIRED_TICKS[level]));
         
         ComponentBuilder progressBar = new ComponentBuilder("[ ").color(ChatColor.DARK_GRAY).bold(true);
         

@@ -3,6 +3,7 @@ package me.sizzlemcgrizzle.saddles.command;
 import de.craftlancer.core.command.SubCommand;
 import de.craftlancer.core.util.MessageLevel;
 import de.craftlancer.core.util.MessageUtil;
+import me.sizzlemcgrizzle.saddles.Config;
 import me.sizzlemcgrizzle.saddles.MountData;
 import me.sizzlemcgrizzle.saddles.Saddles;
 import org.bukkit.Material;
@@ -26,7 +27,7 @@ public class SaddlesSetLevelCommand extends SubCommand {
     @Override
     protected List<String> onTabComplete(CommandSender sender, String[] args) {
         if (args.length == 2)
-            return Collections.singletonList("1-" + MountData.requiredTicks.length);
+            return Collections.singletonList("1-" + Config.REQUIRED_TICKS.length);
         return Collections.emptyList();
     }
     
@@ -60,12 +61,12 @@ public class SaddlesSetLevelCommand extends SubCommand {
             return null;
         }
         
-        if (index < 1 || index > MountData.requiredTicks.length) {
-            MessageUtil.sendMessage(plugin, sender, MessageLevel.INFO, "You must enter a number between 1 and " + MountData.requiredTicks.length);
+        if (index < 1 || index > Config.REQUIRED_TICKS.length) {
+            MessageUtil.sendMessage(plugin, sender, MessageLevel.INFO, "You must enter a number between 1 and " + Config.REQUIRED_TICKS.length);
             return null;
         }
         
-        data.setTicksRidden(MountData.requiredTicks[index - 1]);
+        data.setTicksRidden(Config.REQUIRED_TICKS[index - 1]);
         MessageUtil.sendMessage(plugin, sender, MessageLevel.SUCCESS, "Changed level of mount to " + index);
         return null;
     }

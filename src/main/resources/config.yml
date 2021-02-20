@@ -2,7 +2,10 @@
 prefix: "&8[&9Saddles&8]"
 
 #The amount of ticks a person must ride the mount for per level (multiplied by the level)
-requiredTickMultiplier: 480
+requiredTickMultiplier: 4800
 
 #The delay between clicking a saddle and the mount spawning
 mountSpawnDelay: 30
+
+#The amount of levels a mount can level up to
+numberLevels: 30

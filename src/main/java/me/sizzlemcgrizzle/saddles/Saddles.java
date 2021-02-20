@@ -80,6 +80,9 @@ public class Saddles extends JavaPlugin implements Listener {
         new SaddleTickRunnable(tickID -> {
             for (Player p : Bukkit.getOnlinePlayers()) {
                 
+                if (p.getVehicle() == null)
+                    return;
+                
                 if (tickID % 100 == 0)
                     lastLocations.put(p.getUniqueId(), p.getLocation());
                 
@@ -142,7 +145,7 @@ public class Saddles extends JavaPlugin implements Listener {
                 return;
             else {
                 mountCooldowns.add(player.getUniqueId());
-                new LambdaRunnable(() -> mountCooldowns.remove(player.getUniqueId())).runTaskLater(this, Config.REQUIRED_TICK_MULTIPLIER);
+                new LambdaRunnable(() -> mountCooldowns.remove(player.getUniqueId())).runTaskLater(this, Config.MOUNT_SPAWN_DELAY);
             }
         
         
