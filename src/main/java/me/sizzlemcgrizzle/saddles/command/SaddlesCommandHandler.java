@@ -9,5 +9,6 @@ public class SaddlesCommandHandler extends CommandHandler {
         
         registerSubCommand("createSaddle", new SaddlesCreateSaddleCommand(plugin));
         registerSubCommand("setLevel", new SaddlesSetLevelCommand(plugin));
+        registerSubCommand("reload", new SaddlesReloadCommand(plugin));
     }
 }

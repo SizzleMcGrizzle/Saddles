@@ -1,10 +1,10 @@
 package me.sizzlemcgrizzle.saddles.command;
 
+import de.craftlancer.core.Utils;
 import de.craftlancer.core.command.SubCommand;
 import de.craftlancer.core.util.MessageLevel;
 import de.craftlancer.core.util.MessageUtil;
-import me.sizzlemcgrizzle.saddles.Config;
-import me.sizzlemcgrizzle.saddles.MountData;
+import me.sizzlemcgrizzle.saddles.AbstractHorseMount;
 import me.sizzlemcgrizzle.saddles.Saddles;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
@@ -27,7 +27,9 @@ public class SaddlesSetLevelCommand extends SubCommand {
     @Override
     protected List<String> onTabComplete(CommandSender sender, String[] args) {
         if (args.length == 2)
-            return Collections.singletonList("1-" + Config.REQUIRED_TICKS.length);
+            return Utils.getMatches(args[1], new String[]{"SPEED", "JUMP"});
+        if (args.length == 3)
+            return Utils.getMatches(args[2], new String[]{"1", "2", "3", "4", "5"});
         return Collections.emptyList();
     }
     
@@ -52,22 +54,30 @@ public class SaddlesSetLevelCommand extends SubCommand {
             return null;
         }
         
-        MountData data = plugin.getMountData(item, null);
+        AbstractHorseMount data = plugin.getMount(item, null);
         int index;
         try {
-            index = Integer.parseInt(args[1]);
+            index = Integer.parseInt(args[2]);
         } catch (NumberFormatException e) {
             MessageUtil.sendMessage(plugin, sender, MessageLevel.INFO, "You must enter a valid level.");
             return null;
         }
         
-        if (index < 1 || index > Config.REQUIRED_TICKS.length) {
-            MessageUtil.sendMessage(plugin, sender, MessageLevel.INFO, "You must enter a number between 1 and " + Config.REQUIRED_TICKS.length);
+        if (index < 1 || index > 5) {
+            MessageUtil.sendMessage(plugin, sender, MessageLevel.INFO, "You must enter a number between 1 and 5");
             return null;
         }
         
-        data.setTicksRidden(Config.REQUIRED_TICKS[index - 1]);
-        MessageUtil.sendMessage(plugin, sender, MessageLevel.SUCCESS, "Changed level of mount to " + index);
+        if (args[1].equalsIgnoreCase("SPEED"))
+            data.setSpeedLevel(index);
+        else if (args[1].equalsIgnoreCase("JUMP"))
+            data.setJumpLevel(index);
+        else {
+            MessageUtil.sendMessage(plugin, sender, MessageLevel.SUCCESS, "You must enter a category of level to change.");
+            return null;
+        }
+        
+        MessageUtil.sendMessage(plugin, sender, MessageLevel.SUCCESS, "Changed " + args[1].toLowerCase() + " level of mount to " + index + ".");
         return null;
     }
     

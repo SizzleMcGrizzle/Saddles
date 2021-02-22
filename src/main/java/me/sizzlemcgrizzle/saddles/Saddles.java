@@ -12,7 +12,9 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.configuration.serialization.ConfigurationSerialization;
+import org.bukkit.entity.AbstractHorse;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Horse;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -21,18 +23,17 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.vehicle.VehicleExitEvent;
-import org.bukkit.inventory.HorseInventory;
+import org.bukkit.inventory.AbstractHorseInventory;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.LlamaInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.File;
 import java.io.IOException;
@@ -41,27 +42,36 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class Saddles extends JavaPlugin implements Listener {
     
-    public static NamespacedKey SADDLE_KEY;
+    public static NamespacedKey SADDLE_LEGACY_KEY;
+    public static NamespacedKey SADDLE_COLOR_KEY;
+    public static NamespacedKey SADDLE_ARMOR_KEY;
+    public static NamespacedKey SADDLE_TYPE_KEY;
+    public static NamespacedKey SADDLE_SPEED_LEVEL_KEY;
+    public static NamespacedKey SADDLE_JUMP_LEVEL_KEY;
     public static NamespacedKey SADDLE_UUID_KEY;
     
-    //Stores the locations of mounted players to prevent standing still on mounts gaining xp.
-    private Map<UUID, Location> lastLocations = new HashMap<>();
     //Mount UUID -> MountData
-    private Map<UUID, MountData> mounts = new HashMap<>();
+    private Map<UUID, AbstractHorseMount> mounts = new HashMap<>();
     private List<UUID> mountCooldowns = new ArrayList<>();
     
     @Override
     public void onEnable() {
-        ConfigurationSerialization.registerClass(MountData.class);
+        ConfigurationSerialization.registerClass(AbstractHorseMount.class);
+        ConfigurationSerialization.registerClass(HorseMount.class);
+        ConfigurationSerialization.registerClass(DonkeyMount.class);
         
         Config.load(this);
         
-        SADDLE_KEY = new NamespacedKey(this, "saddleSpawner");
+        SADDLE_LEGACY_KEY = new NamespacedKey(this, "saddleSpawner");
+        SADDLE_COLOR_KEY = new NamespacedKey(this, "saddleColor");
+        SADDLE_ARMOR_KEY = new NamespacedKey(this, "saddleArmor");
+        SADDLE_TYPE_KEY = new NamespacedKey(this, "saddleType");
+        SADDLE_SPEED_LEVEL_KEY = new NamespacedKey(this, "saddleSpeedLevel");
+        SADDLE_JUMP_LEVEL_KEY = new NamespacedKey(this, "saddleJumpLevel");
         SADDLE_UUID_KEY = new NamespacedKey(this, "saddleUUID");
         
         MessageUtil.register(this, new TextComponent(Config.PREFIX), ChatColor.WHITE, ChatColor.YELLOW, ChatColor.RED, ChatColor.DARK_RED, ChatColor.DARK_AQUA, ChatColor.GREEN);
@@ -75,31 +85,7 @@ public class Saddles extends JavaPlugin implements Listener {
         
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         
-        ((List<MountData>) config.getList("mounts", new ArrayList<>())).forEach(m -> mounts.put(m.getId(), m));
-        
-        new SaddleTickRunnable(tickID -> {
-            for (Player p : Bukkit.getOnlinePlayers()) {
-                
-                if (p.getVehicle() == null)
-                    continue;
-                
-                if (tickID % 100 == 0)
-                    lastLocations.put(p.getUniqueId(), p.getLocation());
-                
-                List<MountData> pMounts = mounts.values().stream()
-                        .filter(m -> m.getHorse() != null)
-                        .filter(m -> m.getLastOwner().equals(p.getUniqueId()))
-                        .collect(Collectors.toList());
-                
-                if (pMounts.size() == 0)
-                    continue;
-                
-                for (MountData mountData : pMounts)
-                    if (p.getVehicle() != null && p.getVehicle().equals(mountData.getHorse()))
-                        if (!lastLocations.containsKey(p.getUniqueId()) || p.getLocation().distanceSquared(lastLocations.get(p.getUniqueId())) > 1)
-                            mountData.increaseTicks(this);
-            }
-        }).runTaskTimer(this, 0, 1);
+        ((List<AbstractHorseMount>) config.getList("mounts", new ArrayList<>())).forEach(m -> mounts.put(m.getMountID(), m));
         
         //Clear all existing horses with special tag upon start
         Bukkit.getWorlds().forEach(w -> w.getLivingEntities().stream().filter(e -> hasSaddleKey(e.getPersistentDataContainer())).forEach(Entity::remove));
@@ -124,12 +110,36 @@ public class Saddles extends JavaPlugin implements Listener {
         }
     }
     
-    public MountData getMountData(ItemStack item, UUID lastOwner) {
-        UUID uuid = getSaddleUUID(item.getItemMeta().getPersistentDataContainer());
-        int baseLevel = getSaddleBaseLevel(item.getItemMeta().getPersistentDataContainer());
+    public AbstractHorseMount getMount(ItemStack item, UUID lastOwner) {
+        PersistentDataContainer c = item.getItemMeta().getPersistentDataContainer();
+        UUID uuid = getSaddleUUID(c);
         
-        return mounts.compute(uuid,
-                (k, v) -> v == null ? new MountData(uuid, lastOwner, baseLevel) : v);
+        if (mounts.containsKey(uuid))
+            return mounts.get(uuid);
+        
+        EntityType type = getEntityType(c);
+        
+        AbstractHorseMount mount;
+        switch (type) {
+            case DONKEY:
+                mount = new DonkeyMount(uuid, lastOwner, getSaddleSpeedLevel(c), getSaddleJumpLevel(c));
+                break;
+            case ZOMBIE_HORSE:
+                mount = new ZombieHorseMount(uuid, lastOwner, getSaddleSpeedLevel(c), getSaddleJumpLevel(c));
+                break;
+            case SKELETON_HORSE:
+                mount = new SkeletonHorseMount(uuid, lastOwner, getSaddleSpeedLevel(c), getSaddleJumpLevel(c));
+                break;
+            case LLAMA:
+                mount = new LLamaMount(uuid, lastOwner, getSaddleSpeedLevel(c), getSaddleJumpLevel(c));
+                break;
+            default:
+                mount = new HorseMount(uuid, lastOwner, getSaddleSpeedLevel(c), getSaddleJumpLevel(c), getSaddleColor(c), getSaddleArmor(c));
+                break;
+        }
+        
+        mounts.put(uuid, mount);
+        return mount;
     }
     
     @EventHandler
@@ -156,41 +166,47 @@ public class Saddles extends JavaPlugin implements Listener {
         if (!hasSaddleUUID(item.getItemMeta().getPersistentDataContainer()))
             setSaddleUUID(item, UUID.randomUUID());
         
-        MountData data = getMountData(item, player.getUniqueId());
-        player.getInventory().setItemInMainHand(formatItemStack(item, player, data));
+        AbstractHorseMount mount = getMount(item, player.getUniqueId());
+        player.getInventory().setItemInMainHand(formatItemStack(item, player, mount));
         
-        if (event.getAction() == Action.RIGHT_CLICK_BLOCK || event.getAction() == Action.RIGHT_CLICK_AIR) {
-            Location location = player.getLocation();
-            
-            MessageUtil.sendMessage(this, player, MessageLevel.INFO, "Spawning your mount... stay still for " + (Config.MOUNT_SPAWN_DELAY / (double) 20) + " seconds...");
-            
-            new LambdaRunnable(() -> {
-                if (player.getLocation().distanceSquared(location) < 1)
-                    data.spawn(player);
-                else
-                    MessageUtil.sendMessage(this, player, MessageLevel.WARNING, "You moved and your mount did not spawn!");
-            }).runTaskLater(this, Config.MOUNT_SPAWN_DELAY);
-        } else if (player.hasPermission("saddles.editor"))
-            data.openEditor(this, player);
+        if (event.getAction() == Action.LEFT_CLICK_AIR || event.getAction() == Action.LEFT_CLICK_BLOCK) {
+            if (mount instanceof HorseMount)
+                ((HorseMount) mount).display(this, player);
+            return;
+        }
+        
+        Location location = player.getLocation();
+        
+        MessageUtil.sendMessage(this, player, MessageLevel.INFO, "Spawning your mount... stay still for " + (Config.MOUNT_SPAWN_DELAY / (double) 20) + " seconds...");
+        
+        new LambdaRunnable(() -> {
+            if (player.getLocation().distanceSquared(location) < 1)
+                mount.spawn(player);
+            else
+                MessageUtil.sendMessage(this, player, MessageLevel.WARNING, "You moved and your mount did not spawn!");
+        }).runTaskLater(this, Config.MOUNT_SPAWN_DELAY);
     }
     
-    private ItemStack formatItemStack(ItemStack item, Player lastOwner, MountData data) {
+    private ItemStack formatItemStack(ItemStack item, Player lastOwner, AbstractHorseMount mount) {
         ItemMeta meta = item.getItemMeta();
         List<String> lore = meta.hasLore() ? meta.getLore() : new ArrayList<>();
         
-        if (lore.isEmpty() || lore.stream().noneMatch(line -> line.contains("Last owner: "))) {
+        lore.removeIf(s -> s.contains("§7Level: ") || s.contains("§7Time ridden: ") || s.contains("§7Last owner: "));
+        
+        if (lore.isEmpty() || lore.stream().noneMatch(line -> line.contains("Owner: "))) {
             lore.add("");
-            lore.add(ChatColor.GRAY + "Last owner: " + ChatColor.GOLD + lastOwner.getName());
-            lore.add(ChatColor.GRAY + "Time ridden: " + ChatColor.GOLD + data.formatTimeRidden());
-            lore.add(ChatColor.GRAY + "Level: " + ChatColor.GOLD + data.formatLevel());
+            lore.add(ChatColor.GRAY + "Mount type: " + ChatColor.GOLD + getEntityType(item.getItemMeta().getPersistentDataContainer()).name().toLowerCase().replace("_", " "));
+            lore.add(ChatColor.GRAY + "Owner: " + ChatColor.GOLD + lastOwner.getName());
+            lore.add(ChatColor.GRAY + "Speed: " + ChatColor.GOLD + mount.formatLevel(mount.getSpeedLevel()));
+            lore.add(ChatColor.GRAY + "Jump: " + ChatColor.GOLD + mount.formatLevel(mount.getJumpLevel()));
         } else
             lore = lore.stream().map(s -> {
-                if (s.contains("Last owner: "))
-                    s = ChatColor.GRAY + "Last owner: " + ChatColor.GOLD + lastOwner.getName();
-                else if (s.contains("Time ridden: "))
-                    s = ChatColor.GRAY + "Time ridden: " + ChatColor.GOLD + data.formatTimeRidden();
-                else if (s.contains("Level: "))
-                    s = ChatColor.GRAY + "Level: " + ChatColor.GOLD + data.formatLevel();
+                if (s.contains("Owner: "))
+                    s = ChatColor.GRAY + "Owner: " + ChatColor.GOLD + lastOwner.getName();
+                else if (s.contains("Speed: "))
+                    s = ChatColor.GRAY + "Speed: " + ChatColor.GOLD + mount.formatLevel(mount.getSpeedLevel());
+                else if (s.contains("Jump: "))
+                    s = ChatColor.GRAY + "Jump: " + ChatColor.GOLD + mount.formatLevel(mount.getJumpLevel());
                 return s;
             }).collect(Collectors.toList());
         meta.setLore(lore);
@@ -198,39 +214,37 @@ public class Saddles extends JavaPlugin implements Listener {
         return item;
     }
     
-    @EventHandler
-    public void onInventoryUse(InventoryDragEvent event) {
-        Inventory inventory = event.getInventory();
-        
-        if (!(inventory instanceof HorseInventory))
-            return;
-        
-        HorseInventory horseInventory = (HorseInventory) inventory;
-        
-        if (!hasSaddleKey(horseInventory.getSaddle().getItemMeta().getPersistentDataContainer()))
-            event.setCancelled(true);
-    }
-    
-    @EventHandler
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onInventoryUse(InventoryClickEvent event) {
         Inventory inventory = event.getInventory();
         
-        if (!(inventory instanceof HorseInventory))
+        if (!(inventory instanceof AbstractHorseInventory))
             return;
         
-        HorseInventory horseInventory = (HorseInventory) inventory;
+        AbstractHorseInventory horseInventory = (AbstractHorseInventory) inventory;
         
-        if (hasSaddleKey(horseInventory.getSaddle().getItemMeta().getPersistentDataContainer()))
-            if (event.getClickedInventory() != null && !event.getClickedInventory().equals(event.getWhoClicked().getInventory()))
+        if (horseInventory instanceof LlamaInventory && !hasSaddleKey(((LlamaInventory) horseInventory).getDecor().getItemMeta().getPersistentDataContainer()))
+            return;
+        else if (!hasSaddleKey(horseInventory.getSaddle().getItemMeta().getPersistentDataContainer()))
+            return;
+        
+        if (event.getClickedInventory() != null && !event.getClickedInventory().equals(event.getWhoClicked().getInventory()))
+            if (event.getSlot() == 1 || event.getSlot() == 0)
                 event.setCancelled(true);
+        
+        mounts.values().stream().filter(m -> m instanceof ChestedMount && m.getMount() != null)
+                .filter(m -> m.getMount().getInventory().equals(horseInventory)).findFirst()
+                .ifPresent(m -> new LambdaRunnable(() -> ((ChestedMount) m).setInventory(m.getMount().getInventory())).runTaskLater(this, 1));
+        
+        
     }
     
     @EventHandler
     public void onHorseDamage(EntityDamageEvent event) {
-        if (!(event.getEntity() instanceof Horse))
+        if (!(event.getEntity() instanceof AbstractHorse))
             return;
         
-        Horse horse = (Horse) event.getEntity();
+        AbstractHorse horse = (AbstractHorse) event.getEntity();
         
         if (!hasSaddleKey(horse.getPersistentDataContainer()))
             return;
@@ -238,9 +252,10 @@ public class Saddles extends JavaPlugin implements Listener {
         event.setCancelled(true);
         
         if (event.getCause() != EntityDamageEvent.DamageCause.FALL)
-            horse.remove();
+            mounts.values().stream().filter(e -> e.getMount() != null && e.getMount().equals(horse)).findFirst().ifPresent(AbstractHorseMount::remove);
     }
     
+    //Set mount direction to where player is facing upon mount
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onHorseRightClick(PlayerInteractEntityEvent e) {
         if (e.getRightClicked() instanceof Horse) {
@@ -259,19 +274,57 @@ public class Saddles extends JavaPlugin implements Listener {
         if (!(event.getExited() instanceof Player))
             return;
         
-        if (!(event.getVehicle() instanceof Horse))
+        if (!(event.getVehicle() instanceof AbstractHorse))
             return;
         
         if (hasSaddleKey(event.getVehicle().getPersistentDataContainer()))
-            event.getVehicle().remove();
+            mounts.values().stream()
+                    .filter(e -> e.getMount() != null && e.getMount().equals(event.getVehicle()))
+                    .forEach(AbstractHorseMount::remove);
+    }
+    
+    public EntityType getEntityType(PersistentDataContainer container) {
+        return container.has(SADDLE_TYPE_KEY, PersistentDataType.STRING) ? EntityType.valueOf(container.get(SADDLE_TYPE_KEY, PersistentDataType.STRING)) : EntityType.HORSE;
     }
     
     public boolean hasSaddleKey(PersistentDataContainer container) {
-        return container.has(SADDLE_KEY, PersistentDataType.INTEGER) || container.has(SADDLE_KEY, PersistentDataType.STRING);
+        return container.has(SADDLE_LEGACY_KEY, PersistentDataType.INTEGER)
+                || container.has(SADDLE_UUID_KEY, PersistentDataType.STRING)
+                || container.has(SADDLE_TYPE_KEY, PersistentDataType.STRING);
     }
     
-    public int getSaddleBaseLevel(PersistentDataContainer container) {
-        return container.has(SADDLE_KEY, PersistentDataType.INTEGER) ? container.get(SADDLE_KEY, PersistentDataType.INTEGER) : 0;
+    public int getSaddleSpeedLevel(PersistentDataContainer container) {
+        if (container.has(SADDLE_SPEED_LEVEL_KEY, PersistentDataType.INTEGER) && container.get(SADDLE_SPEED_LEVEL_KEY, PersistentDataType.INTEGER) != -1)
+            return container.get(SADDLE_SPEED_LEVEL_KEY, PersistentDataType.INTEGER);
+        else
+            return getRandomlevel();
+    }
+    
+    public int getSaddleJumpLevel(PersistentDataContainer container) {
+        if (container.has(SADDLE_JUMP_LEVEL_KEY, PersistentDataType.INTEGER) && container.get(SADDLE_JUMP_LEVEL_KEY, PersistentDataType.INTEGER) != -1)
+            return container.get(SADDLE_JUMP_LEVEL_KEY, PersistentDataType.INTEGER);
+        else
+            return getRandomlevel();
+    }
+    
+    private int getRandomlevel() {
+        //0-9
+        int random = (int) (Math.random() * 10);
+        switch (random) {
+            case 0:
+                return 5;
+            case 1:
+            case 2:
+                return 4;
+            case 3:
+            case 4:
+                return 3;
+            case 5:
+            case 6:
+                return 2;
+            default:
+                return 1;
+        }
     }
     
     public void setSaddleUUID(ItemStack item, UUID uuid) {
@@ -290,20 +343,15 @@ public class Saddles extends JavaPlugin implements Listener {
         return id == null ? null : UUID.fromString(id);
     }
     
-    public static class SaddleTickRunnable extends BukkitRunnable {
-        
-        private Consumer<Long> runnable;
-        private long tickID;
-        
-        public SaddleTickRunnable(Consumer<Long> runnable) {
-            this.runnable = runnable;
-            this.tickID = 0;
-        }
-        
-        @Override
-        public void run() {
-            runnable.accept(tickID);
-            tickID++;
-        }
+    public Horse.Color getSaddleColor(PersistentDataContainer container) {
+        return container.has(SADDLE_COLOR_KEY, PersistentDataType.STRING) ?
+                Horse.Color.valueOf(container.get(SADDLE_COLOR_KEY, PersistentDataType.STRING)) :
+                Horse.Color.values()[(int) (Math.random() * Horse.Color.values().length)];
+    }
+    
+    public Material getSaddleArmor(PersistentDataContainer container) {
+        return container.has(SADDLE_ARMOR_KEY, PersistentDataType.STRING) ?
+                Material.valueOf(container.get(SADDLE_ARMOR_KEY, PersistentDataType.STRING)) :
+                Material.AIR;
     }
 }
