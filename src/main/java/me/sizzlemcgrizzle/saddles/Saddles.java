@@ -25,6 +25,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.vehicle.VehicleExitEvent;
 import org.bukkit.inventory.AbstractHorseInventory;
 import org.bukkit.inventory.Inventory;
@@ -46,6 +47,7 @@ import java.util.stream.Collectors;
 
 public class Saddles extends JavaPlugin implements Listener {
     
+    public static NamespacedKey SADDLE_MOUNT_KEY;
     public static NamespacedKey SADDLE_LEGACY_KEY;
     public static NamespacedKey SADDLE_COLOR_KEY;
     public static NamespacedKey SADDLE_ARMOR_KEY;
@@ -66,6 +68,7 @@ public class Saddles extends JavaPlugin implements Listener {
         
         Config.load(this);
         
+        SADDLE_MOUNT_KEY = new NamespacedKey(this, "saddleMount");
         SADDLE_LEGACY_KEY = new NamespacedKey(this, "saddleSpawner");
         SADDLE_COLOR_KEY = new NamespacedKey(this, "saddleColor");
         SADDLE_ARMOR_KEY = new NamespacedKey(this, "saddleArmor");
@@ -88,11 +91,13 @@ public class Saddles extends JavaPlugin implements Listener {
         ((List<AbstractHorseMount>) config.getList("mounts", new ArrayList<>())).forEach(m -> mounts.put(m.getMountID(), m));
         
         //Clear all existing horses with special tag upon start
-        Bukkit.getWorlds().forEach(w -> w.getLivingEntities().stream().filter(e -> hasSaddleKey(e.getPersistentDataContainer())).forEach(Entity::remove));
+        Bukkit.getWorlds().forEach(w -> w.getLivingEntities().stream().filter(e -> hasMountKey(e.getPersistentDataContainer())).forEach(Entity::remove));
     }
     
     @Override
     public void onDisable() {
+        
+        mounts.values().forEach(AbstractHorseMount::remove);
         
         File file = new File(getDataFolder(), "mounts.yml");
         
@@ -223,9 +228,15 @@ public class Saddles extends JavaPlugin implements Listener {
         
         AbstractHorseInventory horseInventory = (AbstractHorseInventory) inventory;
         
-        if (horseInventory instanceof LlamaInventory && !hasSaddleKey(((LlamaInventory) horseInventory).getDecor().getItemMeta().getPersistentDataContainer()))
+        if (horseInventory.getSaddle() == null)
             return;
-        else if (!hasSaddleKey(horseInventory.getSaddle().getItemMeta().getPersistentDataContainer()))
+        
+        if (horseInventory instanceof LlamaInventory) {
+            if (((LlamaInventory) horseInventory).getDecor() == null)
+                return;
+            else if (!hasMountKey(((LlamaInventory) horseInventory).getDecor().getItemMeta().getPersistentDataContainer()))
+                return;
+        } else if (!hasMountKey(horseInventory.getSaddle().getItemMeta().getPersistentDataContainer()))
             return;
         
         if (event.getClickedInventory() != null && !event.getClickedInventory().equals(event.getWhoClicked().getInventory()))
@@ -246,7 +257,7 @@ public class Saddles extends JavaPlugin implements Listener {
         
         AbstractHorse horse = (AbstractHorse) event.getEntity();
         
-        if (!hasSaddleKey(horse.getPersistentDataContainer()))
+        if (!hasMountKey(horse.getPersistentDataContainer()))
             return;
         
         event.setCancelled(true);
@@ -258,15 +269,29 @@ public class Saddles extends JavaPlugin implements Listener {
     //Set mount direction to where player is facing upon mount
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onHorseRightClick(PlayerInteractEntityEvent e) {
-        if (e.getRightClicked() instanceof Horse) {
-            Player player = e.getPlayer();
-            Horse horse = (Horse) e.getRightClicked();
-            Location horseLoc = horse.getLocation().clone();
-            horseLoc.setYaw(player.getLocation().getYaw());
-            horseLoc.setDirection(player.getLocation().getDirection());
-            horse.teleport(horseLoc);
-        }
+        if (!(e.getRightClicked() instanceof AbstractHorse))
+            return;
         
+        AbstractHorse mount = (AbstractHorse) e.getRightClicked();
+        
+        if (!hasSaddleKey(mount.getPersistentDataContainer()) && !hasMountKey(mount.getPersistentDataContainer()))
+            return;
+        
+        mount.remove();
+    }
+    
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        Player player = event.getPlayer();
+        
+        if (player.getVehicle() == null)
+            return;
+        
+        if (!hasMountKey(player.getVehicle().getPersistentDataContainer()))
+            return;
+        
+        mounts.values().stream().filter(e -> e.getMount() != null && e.getMount().getUniqueId().equals(player.getVehicle().getUniqueId()))
+                .findFirst().ifPresent(AbstractHorseMount::remove);
     }
     
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
@@ -277,7 +302,7 @@ public class Saddles extends JavaPlugin implements Listener {
         if (!(event.getVehicle() instanceof AbstractHorse))
             return;
         
-        if (hasSaddleKey(event.getVehicle().getPersistentDataContainer()))
+        if (hasMountKey(event.getVehicle().getPersistentDataContainer()))
             mounts.values().stream()
                     .filter(e -> e.getMount() != null && e.getMount().equals(event.getVehicle()))
                     .forEach(AbstractHorseMount::remove);
@@ -353,5 +378,9 @@ public class Saddles extends JavaPlugin implements Listener {
         return container.has(SADDLE_ARMOR_KEY, PersistentDataType.STRING) ?
                 Material.valueOf(container.get(SADDLE_ARMOR_KEY, PersistentDataType.STRING)) :
                 Material.AIR;
+    }
+    
+    public boolean hasMountKey(PersistentDataContainer container) {
+        return container.has(SADDLE_MOUNT_KEY, PersistentDataType.STRING);
     }
 }

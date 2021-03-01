@@ -82,7 +82,6 @@ public class DonkeyMount extends AbstractHorseMount implements ChestedMount {
     
     @Override
     public void setInventory(AbstractHorseInventory inventory) {
-        
         this.inventory.clear();
         
         for (int i = 2; i < inventory.getSize(); i++) {

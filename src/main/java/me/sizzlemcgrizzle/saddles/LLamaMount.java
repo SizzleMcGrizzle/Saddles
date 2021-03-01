@@ -73,7 +73,7 @@ public class LLamaMount extends AbstractHorseMount implements ChestedMount {
         
         ItemStack carpetItem = new ItemStack(carpet);
         ItemMeta meta = carpetItem.getItemMeta();
-        meta.getPersistentDataContainer().set(Saddles.SADDLE_UUID_KEY, PersistentDataType.STRING, getMountID().toString());
+        meta.getPersistentDataContainer().set(Saddles.SADDLE_MOUNT_KEY, PersistentDataType.STRING, getMountID().toString());
         carpetItem.setItemMeta(meta);
         
         getMount().setCarryingChest(true);

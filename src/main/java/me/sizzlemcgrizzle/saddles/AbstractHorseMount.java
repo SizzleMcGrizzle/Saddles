@@ -51,7 +51,6 @@ public abstract class AbstractHorseMount implements ConfigurationSerializable {
         map.put("ownerID", ownerID.toString());
         map.put("jumpLevel", jumpLevel);
         map.put("speedLevel", speedLevel);
-        
         return map;
     }
     
@@ -63,13 +62,13 @@ public abstract class AbstractHorseMount implements ConfigurationSerializable {
         mount.setOwner(Bukkit.getPlayer(ownerID));
         mount.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(0);
         mount.setCustomName(ChatColor.GREEN + Bukkit.getOfflinePlayer(ownerID).getName() + "'s mount");
-        mount.getPersistentDataContainer().set(Saddles.SADDLE_UUID_KEY, PersistentDataType.STRING, mountID.toString());
+        mount.getPersistentDataContainer().set(Saddles.SADDLE_MOUNT_KEY, PersistentDataType.STRING, mountID.toString());
         getMount().setJumpStrength(calculateJump());
         getMount().getAttribute(Attribute.GENERIC_MOVEMENT_SPEED).setBaseValue(calculateSpeed());
         
         ItemStack saddle = new ItemStack(Material.SADDLE);
         ItemMeta meta = saddle.getItemMeta();
-        meta.getPersistentDataContainer().set(Saddles.SADDLE_UUID_KEY, PersistentDataType.STRING, mountID.toString());
+        meta.getPersistentDataContainer().set(Saddles.SADDLE_MOUNT_KEY, PersistentDataType.STRING, mountID.toString());
         saddle.setItemMeta(meta);
         
         mount.getInventory().setSaddle(saddle);
